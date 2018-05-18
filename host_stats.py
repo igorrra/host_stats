@@ -21,7 +21,7 @@ class HostStats(object):
     """
 
     def __init__(self, file_name):
-        self.file_name = file_name
+        self._file_name = file_name
 
     def process_cpu_stats(self):
         """Get and process host CPU usage"""
@@ -29,7 +29,7 @@ class HostStats(object):
         cpu_usage = psutil.cpu_percent()
         cpu_stats = STATS_TEMPLATE % (now, 'CPU usage:', cpu_usage)
 
-        if self.file_name:
+        if self._file_name:
             self._stats_to_file(cpu_stats)
 
         print cpu_stats
@@ -40,7 +40,7 @@ class HostStats(object):
         mem_usage = psutil.virtual_memory()
         mem_stats = STATS_TEMPLATE % (now, 'RAM usage:', mem_usage.used)
 
-        if self.file_name:
+        if self._file_name:
             self._stats_to_file(mem_stats)
 
         print mem_stats
@@ -51,7 +51,7 @@ class HostStats(object):
         total_pid = len(list(psutil.process_iter()))
         pid_stats = STATS_TEMPLATE % (now, 'Total PIDs:', total_pid)
 
-        if self.file_name:
+        if self._file_name:
             self._stats_to_file(pid_stats)
 
         print pid_stats
@@ -61,7 +61,7 @@ class HostStats(object):
         Append the data to a file
         :param data: data to append
         """
-        with open(self.file_name, 'a') as files:
+        with open(self._file_name, 'a') as files:
             files.write(data + '\n')
 
     def run(self, args):
@@ -74,59 +74,65 @@ class HostStats(object):
             self.process_num_pids()
 
 
-def main(args):
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cpu',
+                        required=False,
+                        action='store_true',
+                        help='Process CPU usage')
+    parser.add_argument('--ram',
+                        required=False,
+                        action='store_true',
+                        help='Process RAM usage')
+    parser.add_argument('--pid',
+                        required=False,
+                        action='store_true',
+                        help='Process total number of running processes')
+    parser.add_argument('--file-name',
+                        dest='file_name',
+                        required=False,
+                        help='Name of the file to save the stats into')
+    parser.add_argument('--delay',
+                        type=int,
+                        required=False,
+                        help='Run stats gather in a loop with specified delay.'
+                             'Only one stats measurement if not specified')
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
     """Initialize HostStats class object and run the stats gathering"""
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)s %(module)s: '
+                               '%(message)s', datefmt='%H:%M:%S')
+    logger = logging.getLogger(__name__)
+
+    args = parse_args()
     metrics = [args.ram, args.cpu, args.pid]
     if not any(metrics):
-        LOGGER.warning('No metrics specified for stats gathering. Exiting.')
+        logger.warning('No metrics specified for stats gathering. Exiting.')
         exit(0)
 
-        LOGGER.info('Getting statistics from the host')
+    logger.info('Getting statistics from the host')
     if args.file_name:
-        LOGGER.info('The stats will be saved to specified file')
+        logger.info('The stats will be saved to specified file')
 
     stats = HostStats(args.file_name)
 
     if args.delay:
-        LOGGER.info('Running stats gathering in a loop '
+        logger.info('Running stats gathering in a loop '
                     'with %s seconds delay', args.delay)
         try:
             while True:
                 stats.run(args)
                 time.sleep(args.delay)
         except KeyboardInterrupt:
-            LOGGER.warning('The script was interrupted by user')
+            logger.warning('The script was interrupted by user')
     else:
         stats.run(args)
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s %(levelname)s %(module)s: '
-                               '%(message)s', datefmt='%H:%M:%S')
-    LOGGER = logging.getLogger(__name__)
-
-    PARSER = argparse.ArgumentParser()
-    PARSER.add_argument('--cpu',
-                        required=False,
-                        action='store_true',
-                        help='Process CPU usage')
-    PARSER.add_argument('--ram',
-                        required=False,
-                        action='store_true',
-                        help='Process RAM usage')
-    PARSER.add_argument('--pid',
-                        required=False,
-                        action='store_true',
-                        help='Process total number of running processes')
-    PARSER.add_argument('--file-name',
-                        dest='file_name',
-                        required=False,
-                        help='Name of the file to save the stats into')
-    PARSER.add_argument('--delay',
-                        type=int,
-                        required=False,
-                        help='Run stats gather in a loop with specified delay.'
-                             'Only one stats measurement if not specified')
-
-    main(PARSER.parse_args())
+    main()
