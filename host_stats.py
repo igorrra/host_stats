@@ -4,10 +4,11 @@ Script for gathering host information:
 - current CPU usage;
 - current number of processes running.
 """
-import time
+import argparse
 import datetime
 import logging
-import argparse
+import time
+
 import psutil
 
 STATS_TEMPLATE = '%s %s %s'
@@ -73,6 +74,32 @@ class HostStats(object):
             self.process_num_pids()
 
 
+def main(args):
+    """Initialize HostStats class object and run the stats gathering"""
+    metrics = [args.ram, args.cpu, args.pid]
+    if not any(metrics):
+        LOGGER.warning('No metrics specified for stats gathering. Exiting.')
+        exit(0)
+
+        LOGGER.info('Getting statistics from the host')
+    if args.file_name:
+        LOGGER.info('The stats will be saved to specified file')
+
+    stats = HostStats(args.file_name)
+
+    if args.delay:
+        LOGGER.info('Running stats gathering in a loop '
+                    'with %s seconds delay', args.delay)
+        try:
+            while True:
+                stats.run(args)
+                time.sleep(args.delay)
+        except KeyboardInterrupt:
+            LOGGER.warning('The script was interrupted by user')
+    else:
+        stats.run(args)
+
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(levelname)s %(module)s: '
@@ -101,27 +128,5 @@ if __name__ == '__main__':
                         required=False,
                         help='Run stats gather in a loop with specified delay.'
                              'Only one stats measurement if not specified')
-    ARGS = PARSER.parse_args()
 
-    METRICS = [ARGS.ram, ARGS.cpu, ARGS.pid]
-    if not any(METRICS):
-        LOGGER.warning('No metrics specified for stats gathering. Exiting.')
-        exit(0)
-
-        LOGGER.info('Getting statistics from the host')
-    if ARGS.file_name:
-        LOGGER.info('The stats will be saved to specified file')
-
-    STATS = HostStats(ARGS.file_name)
-
-    if ARGS.delay:
-        LOGGER.info('Running stats gathering in a loop '
-                    'with %s seconds delay', ARGS.delay)
-        try:
-            while True:
-                STATS.run(ARGS)
-                time.sleep(ARGS.delay)
-        except KeyboardInterrupt:
-            LOGGER.warning('The script was interrupted by user')
-    else:
-        STATS.run(ARGS)
+    main(PARSER.parse_args())
